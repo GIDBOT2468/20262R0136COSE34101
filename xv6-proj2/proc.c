@@ -10,6 +10,9 @@
 struct {
   struct spinlock lock;
   struct proc proc[NPROC];
+
+  // head of ready queue
+  struct proc *ready;
 } ptable;
 
 static struct proc *initproc;
@@ -115,6 +118,21 @@ found:
   return p;
 }
 
+// enque helper function, sorted insert
+static void
+enqueue(struct proc *p)
+{
+  struct proc **pp;
+
+  for(pp = &ptable.ready; *pp; pp = &(*pp)->next)
+    if(p->priority < (*pp)->priority ||
+       (p->priority == (*pp)->priority && p->pid > (*pp)->pid))
+      break;
+  p->next = *pp;
+  *pp = p;
+}
+
+
 //PAGEBREAK: 32
 // Set up first user process.
 void
@@ -151,6 +169,7 @@ userinit(void)
   acquire(&ptable.lock);
 
   p->state = RUNNABLE;
+  enqueue(p);
 
   release(&ptable.lock);
 }
@@ -225,6 +244,7 @@ fork(void)
   acquire(&ptable.lock);
 
   np->state = RUNNABLE;
+  enqueue(np);
 
   release(&ptable.lock);
 
@@ -397,6 +417,7 @@ yield(void)
 {
   acquire(&ptable.lock);  //DOC: yieldlock
   myproc()->state = RUNNABLE;
+  enqueue(myproc());
   sched();
   release(&ptable.lock);
 }
@@ -472,6 +493,7 @@ wakeup1(void *chan)
   for(p = ptable.proc; p < &ptable.proc[NPROC]; p++)
     if(p->state == SLEEPING && p->chan == chan)
       p->state = RUNNABLE;
+      enqueue(p);
 }
 
 // Wake up all processes sleeping on chan.
@@ -498,6 +520,7 @@ kill(int pid)
       // Wake process from sleep if necessary.
       if(p->state == SLEEPING)
         p->state = RUNNABLE;
+        enqueue(p);
       release(&ptable.lock);
       return 0;
     }
