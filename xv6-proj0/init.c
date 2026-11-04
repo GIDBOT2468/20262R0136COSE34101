@@ -34,4 +34,5 @@ main(void)
     while((wpid=wait()) >= 0 && wpid != pid)
       printf(1, "zombie!\n");
   }
+  printf(1, "ID: 2026952319\nName: Gideon Stanley Dyke");
 }

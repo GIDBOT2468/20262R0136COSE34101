@@ -89,3 +89,36 @@ sys_uptime(void)
   release(&tickslock);
   return xticks;
 }
+
+int
+sys_getnice(void)
+{
+  int pid;
+  argint(0, &pid);
+
+  if (pid < 0) {
+    return -1;
+  }
+  else {
+    return getnice(pid);
+  }
+}
+
+int sys_setnice(void)
+{
+  int pid, nice;
+  argint(0, &pid);
+  argint(1, &nice);
+
+  if (pid < 0 || nice < 0) {
+    return -1;
+  } 
+  else {
+    return setnice(pid, nice);
+  }
+}
+
+int sys_ps(void) {
+  ps();
+  return 0;
+}

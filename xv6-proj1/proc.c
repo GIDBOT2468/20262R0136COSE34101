@@ -130,6 +130,7 @@ userinit(void)
     panic("userinit: out of memory?");
   inituvm(p->pgdir, _binary_initcode_start, (int)_binary_initcode_size);
   p->sz = PGSIZE;
+  p->priority = 5;
   memset(p->tf, 0, sizeof(*p->tf));
   p->tf->cs = (SEG_UCODE << 3) | DPL_USER;
   p->tf->ds = (SEG_UDATA << 3) | DPL_USER;
@@ -198,6 +199,7 @@ fork(void)
   }
   np->sz = curproc->sz;
   np->parent = curproc;
+  np->priority = curproc->priority;
   *np->tf = *curproc->tf;
 
   // Clear %eax so that fork returns 0 in the child.
@@ -536,15 +538,21 @@ procdump(void)
 int
 setnice(int pid, int nice)
 {
-    if( nice < 0 || nice > 30)
+   if( nice < 0 || nice > 30)
         return -1;
 
     struct proc *p;
     acquire(&ptable.lock);
 
-    /* ******************** */
-    /* * WRITE YOUR CODE    */
-    /* ******************** */
+    /************************************/
+    for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+      if(p->pid == pid && p->state != UNUSED){
+        p->priority = nice;
+        release(&ptable.lock);
+        return 0;
+      }
+    }
+    /************************************/
 
     release(&ptable.lock);
     return -1;
@@ -556,9 +564,17 @@ getnice(int pid)
     struct proc *p;
     acquire(&ptable.lock);
     
-    /* ******************** */
-    /* * WRITE YOUR CODE    */
-    /* ******************** */
+    /************************************/
+    int n;
+
+    for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+      if(p->pid == pid && p->state != UNUSED){
+        n = p->priority;
+        release(&ptable.lock);
+        return n;
+      }
+    }
+    /************************************/
 
     release(&ptable.lock);
     return -1;
@@ -569,11 +585,27 @@ ps(void)
 {
     struct proc *p;
     acquire(&ptable.lock);
+
     cprintf("name\tpid\tppid\tmem\tprio\tstate\n");
 
-    /* ******************** */
-    /* * WRITE YOUR CODE    */
-    /* ******************** */
+    /************************************/
+    char *state;
+
+    for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+      if(p->state == RUNNING)       state = "RUNNING";
+      else if(p->state == RUNNABLE) state = "RUNNABLE";
+      else if(p->state == SLEEPING) state = "SLEEPING";
+      else continue;
+
+      cprintf("%s\t%d\t%d\t%d\t%d\t%s\n",
+              p->name,
+              p->pid,
+              p->parent ? p->parent->pid : -1,
+              p->sz,
+              p->priority,
+              state);
+    }
+    /************************************/
 
     release(&ptable.lock);
     return;
