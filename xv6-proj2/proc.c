@@ -221,7 +221,7 @@ fork(void)
   np->parent = curproc;
   *np->tf = *curproc->tf;
 
-  // assign priority of each chile process, based on the parent process
+  // assign priority of each child process, based on the parent process
   if (curproc->priority >= 15) {
     np->priority = curproc->priority / 2;
   }
@@ -245,8 +245,11 @@ fork(void)
 
   np->state = RUNNABLE;
   enqueue(np);
-
   release(&ptable.lock);
+
+  if(np->priority < curproc->priority) {
+    yield();
+  }
 
   return pid;
 }
@@ -362,9 +365,9 @@ scheduler(void)
 
     // Loop over process table looking for process to run.
     acquire(&ptable.lock);
-    for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
-      if(p->state != RUNNABLE)
-        continue;
+    p = ptable.ready;
+    if(p) {
+      ptable.ready = p->next;
 
       // Switch to chosen process.  It is the process's job
       // to release ptable.lock and then reacquire it
@@ -381,7 +384,6 @@ scheduler(void)
       c->proc = 0;
     }
     release(&ptable.lock);
-
   }
 }
 
@@ -491,9 +493,10 @@ wakeup1(void *chan)
   struct proc *p;
 
   for(p = ptable.proc; p < &ptable.proc[NPROC]; p++)
-    if(p->state == SLEEPING && p->chan == chan)
+    if(p->state == SLEEPING && p->chan == chan) {
       p->state = RUNNABLE;
       enqueue(p);
+    }
 }
 
 // Wake up all processes sleeping on chan.
@@ -518,9 +521,10 @@ kill(int pid)
     if(p->pid == pid){
       p->killed = 1;
       // Wake process from sleep if necessary.
-      if(p->state == SLEEPING)
+      if(p->state == SLEEPING) {
         p->state = RUNNABLE;
         enqueue(p);
+      }
       release(&ptable.lock);
       return 0;
     }
