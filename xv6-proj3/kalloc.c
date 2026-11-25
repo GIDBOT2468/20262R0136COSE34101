@@ -111,6 +111,8 @@ kalloc(void)
   r = kmem.freelist;
   if(r)
     kmem.freelist = r->next;
+  if(r)
+    pmem.refcount[V2P((char*)r) >> PGSHIFT] = 1;
 
   pmem.num_free_pages--;
 
@@ -128,17 +130,38 @@ freemem(void)
 uint
 get_refcount(uint pa)
 {
-  return 0;
+  if(kmem.use_lock) {
+    acquire(&kmem.lock);
+  }
+  uint c = pmem.refcount[pa >> PGSHIFT];
+  if(kmem.use_lock) {
+    release(&kmem.lock);
+  }
+  return c;
 }
 
 void
 inc_refcount(uint pa)
 {
-  return;
+  if(kmem.use_lock) {
+    acquire(&kmem.lock);
+  }
+  pmem.refcount[pa >> PGSHIFT]++;
+  if(kmem.use_lock) {
+    release(&kmem.lock);
+  }
 }
 
 void  
 dec_refcount(uint pa)
 {
-  return;
+  if(kmem.use_lock) {
+    acquire(&kmem.lock);
+  }
+  if(pmem.refcount[pa >> PGSHIFT] > 0) {
+    pmem.refcount[pa >> PGSHIFT]--;
+  }
+  if(kmem.use_lock) {
+    release(&kmem.lock);
+  }
 }
