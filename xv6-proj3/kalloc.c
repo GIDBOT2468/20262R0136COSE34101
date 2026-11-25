@@ -71,11 +71,23 @@ kfree(char *v)
   if((uint)v % PGSIZE || v < end || V2P(v) >= PHYSTOP)
     panic("kfree");
 
+  if(kmem.use_lock) {
+    acquire(&kmem.lock);
+  }
+  uint i = V2P(v) >> PGSHIFT;
+  if(pmem.refcount[i] > 0) {
+    pmem.refcount[i]--;
+  }
+  if(pmem.refcount[i] > 0){
+    if(kmem.use_lock) {
+      release(&kmem.lock);
+    }
+    return;
+  }
+
   // Fill with junk to catch dangling refs.
   memset(v, 1, PGSIZE);
 
-  if(kmem.use_lock)
-    acquire(&kmem.lock);
   r = (struct run*)v;
   r->next = kmem.freelist;
   kmem.freelist = r;
